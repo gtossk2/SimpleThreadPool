@@ -1,5 +1,8 @@
-all:
-	gcc main.c -lpthread -o example
+all: thread_pool.o 
+	gcc main.c thread_pool.o -lpthread -o example
+
+thread_pool.o: thread_pool.c 
+	gcc thread_pool.c -c
 
 clean:
-	rm example
+	rm -rf example *.o
