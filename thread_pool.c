@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "thread_pool.h"
 
 void queue_push(JobQueue* queue, Job* newJob){
@@ -17,9 +18,9 @@ void queue_push(JobQueue* queue, Job* newJob){
   }
 
   queue->job_number++;
-  if(queue->job_number){
-    queue->has_job = 1;
-  }
+  queue->has_job = 1;
+
+  pthread_cond_signal(&queue->job_cond);
 };
 
 Job* queue_pull(JobQueue* queue){
@@ -47,7 +48,10 @@ Job* queue_pull(JobQueue* queue){
 
   if(!queue->job_number){
     queue->has_job = 0;
+  } else {
+    pthread_cond_signal(&queue->job_cond);
   }
+
   return first_job;
 };
 
@@ -62,6 +66,7 @@ void threadPool_init(ThreadPool *threadPool, int thread_num){
   threadPool->job_pool = malloc(sizeof(JobQueue));
   memset(threadPool->job_pool, 0, sizeof(JobQueue));
   pthread_mutex_init(&threadPool->job_pool->job_mutex, NULL);
+  pthread_cond_init(&threadPool->job_pool->job_cond, NULL);
 
   // Set thread number
   if(thread_num < 1)
@@ -93,10 +98,15 @@ void threadHandler_init(ThreadPool *pool, ThreadHandler *thread_handler){
 void *thread_init(void *thread_pool){
   ThreadPool *threadPool = (ThreadPool *)thread_pool;
   Job *job = NULL;
+  int flag = 0;
 
   do{
     pthread_mutex_lock(&threadPool->job_pool->job_mutex);
-    int flag = threadPool->job_pool->has_job;
+    while(!threadPool->job_pool->has_job){
+      pthread_cond_wait(&threadPool->job_pool->job_cond,
+                        &threadPool->job_pool->job_mutex);
+    }
+    flag = 1;
     pthread_mutex_unlock(&threadPool->job_pool->job_mutex);
 
     if(flag){    
@@ -106,9 +116,11 @@ void *thread_init(void *thread_pool){
       pthread_mutex_unlock(&threadPool->job_pool->job_mutex);
 
       // Handle job task
-      job->job_handler(job->job_argv);
-    } else {
-      /*Wait for task ... */
+      if(job){
+        //pthread_t id = pthread_self();
+        job->job_handler(job->job_argv);
+      }
+      flag = 0;
     }
 
   }while(1);

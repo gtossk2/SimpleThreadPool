@@ -23,6 +23,7 @@ struct jobqueue{
   int job_number;
   int has_job;
   pthread_mutex_t job_mutex;
+  pthread_cond_t job_cond;
 };
 
 struct _thread_handler{
