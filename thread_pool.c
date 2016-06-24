@@ -3,6 +3,20 @@
 #include <string.h>
 #include "thread_pool.h"
 
+#define TRUE           1
+#define FALSE          0
+
+#define DEFAULT_THREAD 1
+
+/** \brief Push a job in the job_queue
+ *
+ * Will push a job into the job queue and signal the pthread_condition
+ *
+ * \param queue  the pointer to the JobQueu structure
+ * \param newJob the pointer to the Job structure
+ *
+ * \return NULL
+ */
 void queue_push(JobQueue* queue, Job* newJob){
   newJob->next_job = NULL;
 
@@ -18,11 +32,21 @@ void queue_push(JobQueue* queue, Job* newJob){
   }
 
   queue->job_number++;
-  queue->has_job = 1;
+  queue->has_job = TRUE;
 
+  // Job is already to be processed
   pthread_cond_signal(&queue->job_cond);
 };
 
+/** \brief Pull a job in the job_queue
+ *
+ *  Return a pointer to the first job in job_queue and signal the
+ *  pthread_condition
+ *
+ * \param queue  the pointer to the JobQueue structure
+ *
+ * \return the pointer to the Job structure
+ */
 Job* queue_pull(JobQueue* queue){
   Job* first_job;
  
@@ -46,8 +70,9 @@ Job* queue_pull(JobQueue* queue){
       break;
   }
 
+  // Make sure it has any job in job_queue
   if(!queue->job_number){
-    queue->has_job = 0;
+    queue->has_job = FALSE;
   } else {
     pthread_cond_signal(&queue->job_cond);
   }
@@ -55,6 +80,16 @@ Job* queue_pull(JobQueue* queue){
   return first_job;
 };
 
+/** \brief Thread Pool Initialize function
+ *
+ *  This function only create the threads inside the threadpool structure.
+ *  You have instanced the threadpool and pass the pointer to function.
+ *
+ * \param threadpool  the pointer to the threadpool structure
+ * \param thread_num  The thread number will be created
+ *
+ * \return NULL
+ */
 void threadPool_init(ThreadPool *threadPool, int thread_num){
   int idx = 0;
 
@@ -68,10 +103,11 @@ void threadPool_init(ThreadPool *threadPool, int thread_num){
   pthread_mutex_init(&threadPool->job_pool->job_mutex, NULL);
   pthread_cond_init(&threadPool->job_pool->job_cond, NULL);
 
-  // Set thread number
-  if(thread_num < 1)
-    thread_num = 1;
-
+  // Set thread number (Default is 1)
+  if(thread_num < 1){
+    thread_num = DEFAULT_THREAD;
+    printf("Create Default thread number ... \n");
+  }
   threadPool->thread_number = thread_num;
 
   // Initial thread_handler
@@ -81,6 +117,15 @@ void threadPool_init(ThreadPool *threadPool, int thread_num){
   }
 };
 
+/** \brief Add Jobs in the Thread Pool function
+ *
+ *  Add the job in the job queue of the threadpool
+ *
+ * \param threadpool  the pointer to the threadpool structure
+ * \param job         the pointer to the Job structure
+ *
+ * \return NULL
+ */
 void threadPool_Add_job(ThreadPool *threadPool, Job *job){
   // Prevent race condition
   pthread_mutex_lock(&threadPool->job_pool->job_mutex);
@@ -88,6 +133,15 @@ void threadPool_Add_job(ThreadPool *threadPool, Job *job){
   pthread_mutex_unlock(&threadPool->job_pool->job_mutex);
 };
 
+/** \brief Initialize threads in the thread pool
+ *
+ *  Will create and initialize the thread_handler (pthread) in the threadpool
+ *
+ * \param threadpool        the pointer to the threadpool structure
+ * \param thread_handler    the pointer to the thread_handler structure
+ *
+ * \return NULL
+ */
 void threadHandler_init(ThreadPool *pool, ThreadHandler *thread_handler){
   thread_handler->pool = pool;
 
@@ -95,6 +149,14 @@ void threadHandler_init(ThreadPool *pool, ThreadHandler *thread_handler){
   pthread_create(pth, NULL, &thread_init, (void *)pool);
 };
 
+/** \brief Start threads function
+ *
+ *  Start to enable each thread handler in the threadpool
+ *
+ * \param threadpool  the pointer to the threadpool structure
+ *
+ * \return NULL
+ */
 void *thread_init(void *thread_pool){
   ThreadPool *threadPool = (ThreadPool *)thread_pool;
   Job *job = NULL;
@@ -102,6 +164,7 @@ void *thread_init(void *thread_pool){
 
   do{
     pthread_mutex_lock(&threadPool->job_pool->job_mutex);
+    // Avoiding CPU Busy Waiting
     while(!threadPool->job_pool->has_job){
       pthread_cond_wait(&threadPool->job_pool->job_cond,
                         &threadPool->job_pool->job_mutex);
@@ -117,21 +180,28 @@ void *thread_init(void *thread_pool){
 
       // Handle job task
       if(job){
-        //pthread_t id = pthread_self();
         job->job_handler(job->job_argv);
       }
       flag = 0;
     }
-
   }while(1);
 }
 
+/** \brief Thread Pool Join function
+ *
+ *  Wait for the threads in the threadpool has been existed.
+ *
+ * \param threadpool  the pointer to the threadpool structure
+ *
+ * \return NULL
+ */
 void threadPool_join(ThreadPool *threadPool){
-  int idx = 0, th_num;
+  int idx = 0, th_num = 0;
   ThreadHandler *th_handler;
   
   th_num = threadPool->thread_number;
 
+  // Join All pthreads 
   for(idx = 0; idx < th_num; idx++){
     th_handler = &threadPool->thread_handler[idx];
     pthread_join(th_handler->thread, 0);
