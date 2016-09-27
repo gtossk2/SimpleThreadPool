@@ -41,6 +41,10 @@ int main(){
   // Destroy mutex and condition variable
   pthread_mutex_destroy(&th_pool.job_pool->job_mutex);
   pthread_cond_destroy(&th_pool.job_pool->job_cond);
+
+  // Free thread pool resources
+  threadPool_free(&th_pool);
+
   return 0;
 }
 

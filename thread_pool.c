@@ -99,6 +99,11 @@ void threadPool_init(ThreadPool *threadPool, int thread_num){
 
   // Initial Job Queue
   threadPool->job_pool = malloc(sizeof(JobQueue));
+  if(threadPool->job_pool == NULL){
+    printf("Job pool can not allocate memory...\n");
+    return;
+  }
+
   memset(threadPool->job_pool, 0, sizeof(JobQueue));
   pthread_mutex_init(&threadPool->job_pool->job_mutex, NULL);
   pthread_cond_init(&threadPool->job_pool->job_cond, NULL);
@@ -112,10 +117,38 @@ void threadPool_init(ThreadPool *threadPool, int thread_num){
 
   // Initial thread_handler
   threadPool->thread_handler = malloc(sizeof(ThreadHandler) * thread_num);
+  if(threadPool->thread_handler == NULL){
+    printf("Thread handler cannot allocate memory ... \n");
+    return;
+  }
+
   for(idx = 0; idx < thread_num; idx++){
     threadHandler_init(threadPool, &threadPool->thread_handler[idx]);
   }
 };
+
+/** \brief Thread Pool Free function
+ *
+ *  This function will free the memory allocated by thread pool
+ *
+ * \param threadpool  the pointer to the threadpool structure
+ *
+ * \return NULL
+ */
+void threadPool_free(ThreadPool *threadpool){
+
+  // Free job_pool
+  if(threadpool->job_pool){
+    free(threadpool->job_pool);
+  }
+
+  // Free thread_handler
+  if(threadpool->thread_handler){
+    free(threadpool->thread_handler);
+  }
+
+  return;
+}
 
 /** \brief Add Jobs in the Thread Pool function
  *

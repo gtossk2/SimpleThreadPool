@@ -53,6 +53,16 @@ struct threadPool{
  */
 void threadPool_init(ThreadPool *threadPool, int thread_num);
 
+/** \brief Thread Pool Free function
+ *
+ *  This function will free the memory allocated by thread pool
+ *
+ * \param threadpool  the pointer to the threadpool structure
+ *
+ * \return NULL
+ */
+void threadPool_free(ThreadPool *threadpool);
+
 /** \brief Add Jobs in the Thread Pool function
  *
  *  Add the job in the job queue of the threadpool
